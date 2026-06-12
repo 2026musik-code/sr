@@ -3,7 +3,8 @@ import {
   Terminal, Server, Globe, ShieldAlert, Cpu, 
   Wifi, Play, CheckCircle2, XCircle, Code, Copy, 
   Activity, Settings, Info, AlertTriangle,
-  Folder, HardDrive, Smartphone, List, Bookmark, Trash2, FileText
+  Folder, HardDrive, Smartphone, List, Bookmark, Trash2, FileText,
+  Battery, Clipboard as ClipboardIcon, Bell, Volume2, MessageSquare, Zap
 } from 'lucide-react';
 
 class ErrorBoundary extends Component<{children: React.ReactNode}, {hasError: boolean, error: Error | null}> {
@@ -138,6 +139,12 @@ export default function App() {
   const [fileLoading, setFileLoading] = useState(false);
   const [currentPathDisplay, setCurrentPathDisplay] = useState('/sdcard');
 
+  const [deviceLoading, setDeviceLoading] = useState(false);
+  const [deviceData, setDeviceData] = useState<{
+    battery: any, wifi: any, clipboard: string | null
+  }>({ battery: null, wifi: null, clipboard: null });
+  const [toastMsg, setToastMsg] = useState('Halo dari TermuxWeb!');
+
   const [sysLoading, setSysLoading] = useState(false);
   const [sysData, setSysData] = useState<{
     storage: { total: string, used: string, free: string, percent: number } | null,
@@ -214,6 +221,51 @@ ps aux 2>/dev/null | awk 'NR>1 {print $2"|"$3"|"$4"|"$11}' | sort -t'|' -k2 -nr 
     setSysLoading(false);
   };
 
+  const loadDeviceInfo = async () => {
+    if (!isConnected || !apiUrl) return;
+    setDeviceLoading(true);
+    try {
+      const url = new URL(apiUrl);
+      const cmd = `
+echo "_BATTERY_"
+termux-battery-status 2>/dev/null
+echo "_WIFI_"
+termux-wifi-connectioninfo 2>/dev/null
+echo "_CLIPBOARD_"
+termux-clipboard-get 2>/dev/null
+      `;
+      const res = await fetch(`${url.origin}/api/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command: cmd })
+      });
+      const data = await res.json();
+      if (!data.error) {
+         const out = data.output;
+         const sections = out.split(/_(BATTERY|WIFI|CLIPBOARD)_/).map((s: string) => s.trim());
+         const newDeviceData = {...deviceData};
+         
+         try {
+           const batStr = sections[sections.indexOf('BATTERY') + 1];
+           if (batStr) newDeviceData.battery = JSON.parse(batStr);
+         } catch(e) {}
+         
+         try {
+           const wifiStr = sections[sections.indexOf('WIFI') + 1];
+           if (wifiStr) newDeviceData.wifi = JSON.parse(wifiStr);
+         } catch(e) {}
+         
+         const clipStr = sections[sections.indexOf('CLIPBOARD') + 1];
+         if (clipStr) newDeviceData.clipboard = clipStr;
+         
+         setDeviceData(newDeviceData);
+      }
+    } catch (e) {
+      console.error("Device Info Error:", e);
+    }
+    setDeviceLoading(false);
+  };
+
   useEffect(() => {
     localStorage.setItem('termux_snippets', JSON.stringify(snippets));
   }, [snippets]);
@@ -221,6 +273,9 @@ ps aux 2>/dev/null | awk 'NR>1 {print $2"|"$3"|"$4"|"$11}' | sort -t'|' -k2 -nr 
   useEffect(() => {
     if (activeTab === 'system' && isConnected && !sysData.storage) {
       loadSystemInfo();
+    }
+    if (activeTab === 'device' && isConnected && !deviceData.battery) {
+      loadDeviceInfo();
     }
   }, [activeTab, isConnected]);
 
@@ -650,16 +705,68 @@ ps aux 2>/dev/null | awk 'NR>1 {print $2"|"$3"|"$4"|"$11}' | sort -t'|' -k2 -nr 
             {/* TERMUX API TAB */}
             {activeTab === 'device' && (
               <div className="space-y-6 fade-in">
-                <Header title="Termux API Control" desc="Kontrol fitur HP Android (perlu install termux-api)" icon={<Smartphone className="text-pink-400"/>} />
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-5">
-                  <div className="p-3 bg-slate-950 border border-slate-800 text-slate-300 text-sm rounded-lg">
-                    Pastikan Anda sudah menginstall plugin <code>pkg install termux-api</code> di termux dan aplikasi Termux:API dari F-Droid.
+                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-slate-900 border border-slate-800 p-4 sm:p-5 rounded-xl">
+                  <div>
+                    <h2 className="text-xl font-bold text-white flex items-center gap-2"><Smartphone className="text-pink-400 w-5 h-5"/> Termux API Control</h2>
+                    <p className="text-sm text-slate-400 mt-1">Status baterai, clipboard, dan kontrol hardware.</p>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <ActionBtn onClick={() => executeCommand(`termux-battery-status`, 'Baterai Status')} label="1. Cek Status Baterai" />
-                    <ActionBtn onClick={() => executeCommand(`termux-location`, 'GPS Location')} label="2. Ambil Lokasi GPS" />
-                    <ActionBtn onClick={() => executeCommand(`termux-clipboard-get`, 'Get Clipboard')} label="3. Baca Clipboard HP" />
-                    <ActionBtn onClick={() => executeCommand(`termux-vibrate -d 1000`, 'Vibrate')} label="4. Getarkan HP (1 Detik)" />
+                  <button onClick={loadDeviceInfo} disabled={deviceLoading} className="bg-pink-600/20 hover:bg-pink-600 text-pink-400 hover:text-white px-4 py-2 rounded-lg transition disabled:opacity-50 flex items-center justify-center gap-2 font-medium text-sm">
+                    <Activity className={`w-4 h-4 ${deviceLoading ? 'animate-spin' : ''}`} />
+                    <span>Refresh Data</span>
+                  </button>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {/* Baterai Card */}
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm">
+                    <h3 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2"><Battery className="w-4 h-4 text-emerald-400" /> Baterai HP</h3>
+                    {deviceData.battery ? (
+                      <div className="space-y-3">
+                         <div className="flex items-end gap-3">
+                           <span className="text-3xl font-bold text-white">{deviceData.battery.percentage}%</span>
+                           <span className="text-sm text-slate-400 pb-1 uppercase">{deviceData.battery.status}</span>
+                         </div>
+                         <div className="flex justify-between text-xs text-slate-400">
+                           <span>Suhu: {deviceData.battery.temperature}°C</span>
+                           <span>Health: {deviceData.battery.health}</span>
+                           <span>Power: {deviceData.battery.plugged}</span>
+                         </div>
+                         <div className="w-full bg-slate-950 rounded-full h-2.5 overflow-hidden border border-slate-800">
+                           <div className={`h-full rounded-full transition-all duration-500 ${deviceData.battery.percentage > 20 ? 'bg-emerald-500' : 'bg-rose-500'}`} style={{ width: `${deviceData.battery.percentage}%` }}></div>
+                         </div>
+                      </div>
+                    ) : <div className="text-sm text-slate-500 py-2">Pastikan aplikasi <b>Termux:API</b> terinstall di PlayStore / F-Droid, lalu jalankan <code className="text-emerald-400">pkg install termux-api</code> di termux.</div>}
+                  </div>
+
+                  {/* Clipboard Card */}
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm flex flex-col min-h-0">
+                    <h3 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2"><ClipboardIcon className="w-4 h-4 text-amber-400" /> Clipboard Saat Ini</h3>
+                    <div className="bg-slate-950 border border-slate-800 rounded-lg p-3 text-sm text-slate-300 flex-1 overflow-y-auto whitespace-pre-wrap">
+                      {deviceData.clipboard !== null ? (deviceData.clipboard || '< Clipboard Kosong >') : 'Tekan Refresh Data...'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* API Actions */}
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm">
+                  <h3 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2"><Zap className="w-4 h-4 text-pink-400" /> Quick Device Actions</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                     <div className="flex gap-2">
+                        <input type="text" value={toastMsg} onChange={(e) => setToastMsg(e.target.value)} placeholder="Teks notif..." className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none"/>
+                        <button onClick={() => executeCommand(`termux-toast "${toastMsg}"`, 'Show Toast')} className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-sm transition flex items-center justify-center gap-1.5"><MessageSquare className="w-4 h-4"/> Toast</button>
+                     </div>
+                     <div className="flex gap-2">
+                        <button onClick={() => executeCommand(`termux-vibrate -d 500`, 'Getarkan')} className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-sm transition flex items-center justify-center gap-2"><Bell className="w-4 h-4"/> Getar</button>
+                        <button onClick={() => executeCommand(`termux-torch on`, 'Senter ON')} className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-sm transition flex items-center justify-center gap-2"><Zap className="w-4 h-4"/> Senter ON</button>
+                        <button onClick={() => executeCommand(`termux-torch off`, 'Senter OFF')} className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-sm transition text-center">OFF</button>
+                     </div>
+                     <div className="flex gap-2 sm:col-span-2">
+                        <input type="text" id="ttsInput" placeholder="Teks untuk diucapkan HP..." className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none"/>
+                        <button onClick={() => {
+                          const val = (document.getElementById('ttsInput') as HTMLInputElement).value;
+                          if(val) executeCommand(`termux-tts-speak "${val}"`, 'Text to Speech');
+                        }} className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-lg text-sm transition flex items-center justify-center gap-2"><Volume2 className="w-4 h-4"/> Ucapkan Suara</button>
+                     </div>
                   </div>
                 </div>
               </div>
