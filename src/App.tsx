@@ -1,9 +1,72 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Component, ErrorInfo } from 'react';
 import { 
   Terminal, Server, Globe, ShieldAlert, Cpu, 
   Wifi, Play, CheckCircle2, XCircle, Code, Copy, 
-  Activity, Settings, Info
+  Activity, Settings, Info, AlertTriangle
 } from 'lucide-react';
+
+class ErrorBoundary extends Component<{children: React.ReactNode}, {hasError: boolean, error: Error | null}> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("ErrorBoundary caught an error", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-8 bg-slate-950 text-white min-h-screen flex flex-col items-center justify-center">
+          <AlertTriangle className="h-16 w-16 text-rose-500 mb-4" />
+          <h1 className="text-xl font-bold mb-2">Terjadi Kesalahan (App Crashed)</h1>
+          <p className="text-slate-400 mb-4 text-center max-w-md">Silakan refresh halaman atau periksa console browser.</p>
+          <pre className="text-xs bg-slate-900 p-4 rounded text-rose-400 overflow-auto max-w-full">
+            {this.state.error?.toString()}
+          </pre>
+          <button onClick={() => window.location.reload()} className="mt-6 bg-emerald-600 hover:bg-emerald-500 px-6 py-2 rounded font-medium text-sm transition text-white">Refresh Halaman</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+const fallbackCopyTextToClipboard = (text: string) => {
+  const textArea = document.createElement("textarea");
+  textArea.value = text;
+  
+  // Prevent scrolling to bottom of page in MS Edge.
+  textArea.style.top = "0";
+  textArea.style.left = "0";
+  textArea.style.position = "fixed";
+
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+
+  try {
+    document.execCommand('copy');
+  } catch (err) {
+    console.error('Fallback: Oops, unable to copy', err);
+  }
+  document.body.removeChild(textArea);
+};
+
+const copyToClipboard = async (text: string) => {
+  if (!navigator.clipboard) {
+    fallbackCopyTextToClipboard(text);
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch (err) {
+    console.error('Async: Could not copy text: ', err);
+    fallbackCopyTextToClipboard(text);
+  }
+};
 
 const TERMUX_AGENT_SCRIPT = `#!/data/data/com.termux/files/usr/bin/bash
 clear
@@ -115,13 +178,14 @@ export default function App() {
     }
   };
 
-  const copyScript = () => {
-    navigator.clipboard.writeText(b64OneLiner);
+  const copyScript = async () => {
+    await copyToClipboard(b64OneLiner);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   return (
+    <ErrorBoundary>
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans flex">
       {/* Sidebar */}
       <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col hidden md:flex">
@@ -354,6 +418,7 @@ export default function App() {
         </div>
       </main>
     </div>
+    </ErrorBoundary>
   );
 }
 
