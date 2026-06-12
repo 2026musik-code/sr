@@ -133,6 +133,10 @@ export default function App() {
   const [snippets, setSnippets] = useState<{title: string, cmd: string}[]>(() => {
     try { return JSON.parse(localStorage.getItem('termux_snippets') || '[]'); } catch { return []; }
   });
+  
+  const [fileList, setFileList] = useState<{name: string, isDir: boolean}[]>([]);
+  const [fileLoading, setFileLoading] = useState(false);
+  const [currentPathDisplay, setCurrentPathDisplay] = useState('/sdcard');
 
   useEffect(() => {
     localStorage.setItem('termux_snippets', JSON.stringify(snippets));
@@ -211,6 +215,45 @@ export default function App() {
     } catch (e: any) {
       setTerminalOutput(`> Failed to send command to Termux.\n> Error: ${e.message}`);
     }
+  };
+
+  const loadDirectory = async (targetPath: string) => {
+    if (!isConnected || !apiUrl) return;
+    setFileLoading(true);
+    setCurrentPathDisplay(targetPath);
+    setFilePath(targetPath);
+
+    try {
+      const url = new URL(apiUrl);
+      const res = await fetch(`${url.origin}/api/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command: `ls -1pa "${targetPath}"` })
+      });
+      const data = await res.json();
+      if (!data.error) {
+        const lines = data.output.split('\n').filter((l:string) => l.trim().length > 0 && l !== './' && l !== '../');
+        const parsedList = lines.map((line: string) => {
+          const isDir = line.endsWith('/');
+          const name = isDir ? line.slice(0, -1) : line;
+          return { name, isDir };
+        });
+        
+        parsedList.sort((a, b) => {
+          if (a.isDir && !b.isDir) return -1;
+          if (!a.isDir && b.isDir) return 1;
+          return a.name.localeCompare(b.name);
+        });
+        
+        setFileList(parsedList);
+      } else {
+         setTerminalOutput(`> Error opening ${targetPath}\n${data.error}`);
+         setActiveTab('terminal');
+      }
+    } catch (e: any) {
+      console.error("Load directory fail", e);
+    }
+    setFileLoading(false);
   };
 
   const copyScript = async () => {
@@ -372,21 +415,59 @@ export default function App() {
 
             {/* FILE MANAGER TAB */}
             {activeTab === 'files' && (
-              <div className="space-y-6 fade-in">
-                <Header title="File Manager" desc="Jelajahi dan atur file di Termux / SD Card" icon={<Folder className="text-yellow-400"/>} />
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-5">
-                  <div>
-                    <label className="block text-sm text-slate-400 mb-1.5">Path Direktori / File</label>
+              <div className="space-y-6 fade-in h-[calc(100vh-140px)] flex flex-col">
+                <Header title="File Manager" desc="Jelajahi file Termux (Peringatan: Root tidak didukung)" icon={<Folder className="text-yellow-400"/>} />
+                <div className="bg-slate-900 border border-slate-800 rounded-xl flex-1 flex flex-col min-h-0">
+                  <div className="p-4 border-b border-slate-800 flex gap-2 items-center shrink-0">
                     <input 
                       type="text" value={filePath} onChange={(e) => setFilePath(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 focus:outline-none focus:ring-1 focus:ring-yellow-500"
+                      onKeyDown={(e) => e.key === 'Enter' && loadDirectory(filePath)}
+                      className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 text-sm focus:outline-none focus:ring-1 focus:ring-yellow-500"
                     />
+                    <button onClick={() => loadDirectory(filePath)} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition cursor-pointer">
+                      Load
+                    </button>
+                    <button 
+                      onClick={() => {
+                         const parent = currentPathDisplay.split('/').slice(0, -1).join('/') || '/';
+                         loadDirectory(parent);
+                      }} 
+                      className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-2.5 rounded-lg text-sm transition cursor-pointer">
+                      Up
+                    </button>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <ActionBtn onClick={() => executeCommand(`ls -la ${filePath}`, 'List Files')} label="1. Lihat Isi Folder (ls)" />
-                    <ActionBtn onClick={() => executeCommand(`cat ${filePath}`, 'Read File')} label="2. Baca File (cat)" />
-                    <ActionBtn onClick={() => executeCommand(`rm -rf ${filePath}`, 'Delete Item')} label="3. Hapus (rm -rf)" />
-                    <ActionBtn onClick={() => executeCommand(`pwd`, 'Print Working Dir')} label="4. Cek Posisi (pwd)" />
+                  
+                  <div className="flex-1 overflow-y-auto p-2">
+                    {fileLoading ? (
+                      <div className="flex items-center justify-center h-full text-slate-500 text-sm">
+                        <Activity className="w-5 h-5 animate-spin mr-2"/> Memuat direktori...
+                      </div>
+                    ) : (
+                      fileList.length === 0 ? (
+                        <div className="flex items-center justify-center p-8 text-slate-500 text-sm">Folder kosong atau tidak dapat diakses. (Coba load terlebih dahulu)</div>
+                      ) : (
+                        <ul className="space-y-1">
+                          {fileList.map((f, i) => (
+                            <li key={i} className="group flex items-center justify-between p-2.5 hover:bg-slate-800/50 rounded-lg cursor-pointer transition"
+                                onClick={() => {
+                                   if(f.isDir) {
+                                     const newPath = currentPathDisplay.endsWith('/') ? `${currentPathDisplay}${f.name}` : `${currentPathDisplay}/${f.name}`;
+                                     loadDirectory(newPath);
+                                   }
+                                }}>
+                              <div className="flex items-center gap-3 overflow-hidden">
+                                {f.isDir ? <Folder fill="currentColor" className="w-5 h-5 text-yellow-500 shrink-0"/> : <FileText className="w-5 h-5 text-slate-400 shrink-0"/>}
+                                <span className={`text-sm truncate ${f.isDir ? 'text-slate-200 font-medium' : 'text-slate-400'}`}>{f.name}</span>
+                              </div>
+                              <div className="flex gap-2">
+                                 {!f.isDir && <button onClick={(e) => { e.stopPropagation(); executeCommand(`cat "${currentPathDisplay}/${f.name}"`, 'Read File'); }} className="pr-3 text-xs text-emerald-500 opacity-0 group-hover:opacity-100 transition">Baca</button>}
+                                 <button onClick={(e) => { e.stopPropagation(); executeCommand(`rm -rf "${currentPathDisplay}/${f.name}"`, 'Delete'); }} className="pr-3 text-xs text-rose-500 opacity-0 group-hover:opacity-100 transition">Hapus</button>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      )
+                    )}
                   </div>
                 </div>
               </div>
