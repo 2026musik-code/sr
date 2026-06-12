@@ -309,31 +309,25 @@ export default function App() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden">
         {/* Mobile Header */}
-        <div className="md:hidden bg-slate-900 p-4 border-b border-slate-800 flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <Terminal className="text-emerald-400 h-5 w-5" />
-            <span className="font-bold text-white">TermuxUI</span>
+        <div className="md:hidden bg-slate-900 border-b border-slate-800 flex flex-col shrink-0">
+          <div className="p-4 border-b border-slate-800/50 flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <Terminal className="text-emerald-400 h-5 w-5" />
+              <span className="font-bold text-white">Termux Web UI</span>
+            </div>
           </div>
-          <select 
-            className="bg-slate-800 border border-slate-700 rounded text-sm p-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-            value={activeTab}
-            onChange={(e) => setActiveTab(e.target.value)}
-          >
-            <option value="setup">Setup & Koneksi</option>
-            <optgroup label="5 Fitur Baru">
-              <option value="files">File Manager</option>
-              <option value="system">System Monitor</option>
-              <option value="device">Termux API Control</option>
-              <option value="processes">Process Manager</option>
-              <option value="snippets">Custom Snippets</option>
-            </optgroup>
-            <optgroup label="Lanjutan">
-              <option value="network">Network Scanner</option>
-              <option value="scraper">Web Scraper</option>
-              <option value="apk">APK Analyzer</option>
-            </optgroup>
-            <option value="terminal">Terminal Output</option>
-          </select>
+          <div className="flex overflow-x-auto whitespace-nowrap p-3 gap-2 [&::-webkit-scrollbar]:hidden">
+            <button onClick={() => setActiveTab('setup')} className={`px-4 py-2 text-sm rounded-full font-medium transition-colors ${activeTab === 'setup' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>Setup</button>
+            <button onClick={() => setActiveTab('files')} className={`px-4 py-2 text-sm rounded-full font-medium transition-colors gap-1.5 flex items-center ${activeTab === 'files' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}><Folder className="w-4 h-4"/> Files</button>
+            <button onClick={() => setActiveTab('system')} className={`px-4 py-2 text-sm rounded-full font-medium transition-colors gap-1.5 flex items-center ${activeTab === 'system' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}><HardDrive className="w-4 h-4"/> System</button>
+            <button onClick={() => setActiveTab('device')} className={`px-4 py-2 text-sm rounded-full font-medium transition-colors gap-1.5 flex items-center ${activeTab === 'device' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}><Smartphone className="w-4 h-4"/> Device</button>
+            <button onClick={() => setActiveTab('processes')} className={`px-4 py-2 text-sm rounded-full font-medium transition-colors gap-1.5 flex items-center ${activeTab === 'processes' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}><List className="w-4 h-4"/> Processes</button>
+            <button onClick={() => setActiveTab('snippets')} className={`px-4 py-2 text-sm rounded-full font-medium transition-colors gap-1.5 flex items-center ${activeTab === 'snippets' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}><Bookmark className="w-4 h-4"/> Snippets</button>
+            <button onClick={() => setActiveTab('network')} className={`px-4 py-2 text-sm rounded-full font-medium transition-colors gap-1.5 flex items-center ${activeTab === 'network' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}><Wifi className="w-4 h-4"/> Scanner</button>
+            <button onClick={() => setActiveTab('scraper')} className={`px-4 py-2 text-sm rounded-full font-medium transition-colors gap-1.5 flex items-center ${activeTab === 'scraper' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}><Globe className="w-4 h-4"/> Scraper</button>
+            <button onClick={() => setActiveTab('apk')} className={`px-4 py-2 text-sm rounded-full font-medium transition-colors gap-1.5 flex items-center ${activeTab === 'apk' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}><Cpu className="w-4 h-4"/> APK</button>
+            <button onClick={() => setActiveTab('terminal')} className={`px-4 py-2 text-sm rounded-full font-medium transition-colors gap-1.5 flex items-center ${activeTab === 'terminal' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}><Activity className="w-4 h-4"/> Terminal</button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-auto p-4 sm:p-8">
@@ -341,28 +335,21 @@ export default function App() {
             
             {/* SETUP TAB */}
             {activeTab === 'setup' && (
-              <div className="space-y-6">
+              <div className="space-y-6 fade-in">
                 <div>
-                  <h2 className="text-2xl font-bold text-white mb-2">Penjelasan Error Anda</h2>
-                  <div className="bg-rose-500/10 border border-rose-500/30 text-rose-200 p-4 rounded-xl text-sm leading-relaxed">
-                    Error <code className="text-rose-400 font-mono">SyntaxError: invalid decimal literal</code> (dengan \`min-height: 100vh\`) terjadi karena URL <em>AI Studio / Web UI</em> ini dikunci dengan <strong>Halaman Login Proxy</strong>. <br/><br/>
-                    Saat Termux Anda menjalankan <code className="text-rose-400">curl</code>, ia malah mendownload halaman HTML Login tersebut, BUKAN mendownload kode Python-nya. Itulah kenapa Python menjadi error!
-                  </div>
-                </div>
-
-                <div className="mt-8">
-                  <h2 className="text-xl font-bold text-white mb-3 flex items-center gap-2">
-                    <CheckCircle2 className="text-emerald-400 w-6 h-6" /> Solusi Terbaik: Base64 + Auto-Tunnel
+                  <h2 className="text-2xl font-bold text-white mb-3 flex items-center gap-2">
+                    <Terminal className="text-emerald-400 w-6 h-6" /> Setup & Koneksi
                   </h2>
-                  <p className="text-slate-400 text-sm">Kembali ke konsep awal (Termux sebagai server), namun agar web (berbasis HTTPS) ini bisa menghubungi Termux Anda <strong>tanpa diblokir oleh sistem Mixed Content maupun Proxy</strong>, kita akan membangun komunikasi lewat <strong className="text-emerald-400">Tunnel Cloudflare gratis</strong>.</p>
+                  <p className="text-slate-400 text-sm">Jalankan script instalasi otomatis di ponsel/Termux Anda. Sistem akan membuka Cloudflare tunnel sehingga UI ini dapat terhubung dengan mulus.</p>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
                   <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
                     <h3 className="font-semibold text-white flex items-center gap-2"><Terminal className="w-5 h-5 text-emerald-400"/> 1. Copy-Paste Script Termux</h3>
                     <div className="text-sm text-slate-400">
-                      <p>Copy script panjang di bawah ini (sudah dikodekan ke Base64 agar tidak perlu memakai jaringan/curl), lalu paste dan Enter di Termux:</p>
+                      <p>Copy script panjang di bawah ini (sudah dikodekan ke Base64 agar tidak perlu memakai jaringan/curl jika error), lalu paste dan Enter di Termux:</p>
                     </div>
+
                     
                     <div className="bg-black/50 rounded-xl border border-slate-800 overflow-hidden relative">
                       <button onClick={copyScript} className="absolute top-2 right-2 text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded flex items-center gap-2 text-white shadow">
