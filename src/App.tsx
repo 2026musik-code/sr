@@ -1,0 +1,396 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  Terminal, Server, Globe, ShieldAlert, Cpu, 
+  Wifi, Play, CheckCircle2, XCircle, Code, Copy, 
+  Activity, Settings, Info
+} from 'lucide-react';
+
+const TERMUX_AGENT_SCRIPT = `#!/data/data/com.termux/files/usr/bin/bash
+clear
+echo -e "\\e[32m[+] Memulai Setup Termux Agent...\\e[0m"
+pkg update -y > /dev/null 2>&1
+pkg install -y python cloudflared > /dev/null 2>&1
+pip install flask flask-cors requests > /dev/null 2>&1
+
+cat << 'EOF' > termux_api.py
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+import subprocess
+
+app = Flask(__name__)
+CORS(app)
+
+@app.route('/api/ping', methods=['GET'])
+def ping():
+    return jsonify({"status": "ok"})
+
+@app.route('/api/execute', methods=['POST'])
+def execute():
+    try:
+        cmd = request.json.get('command', '')
+        res = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=120)
+        return jsonify({"output": res.stdout, "error": res.stderr})
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+if __name__ == '__main__':
+    app.run(host='127.0.0.1', port=5000)
+EOF
+
+killall python > /dev/null 2>&1
+python termux_api.py &
+sleep 3
+
+echo -e "\\e[34m===================================================\\e[0m"
+echo -e "\\e[32m[!] TUNGGU LOG CLOUDFLARE MUNCUL DI BAWAH...\\e[0m"
+echo -e "\\e[33m[!] CARI LINK HTTPS BERAWALAN https:// ... DAN BEREKSTENSI .trycloudflare.com\\e[0m"
+echo -e "\\e[33m[!] COPY LINK TERSEBUT DAN PASTE KE WEB UI\\e[0m"
+echo -e "\\e[34m===================================================\\e[0m"
+cloudflared tunnel --url http://127.0.0.1:5000
+`;
+
+export default function App() {
+  const [activeTab, setActiveTab] = useState('setup');
+  const [apiUrl, setApiUrl] = useState('');
+  const [isConnected, setIsConnected] = useState<boolean | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [terminalOutput, setTerminalOutput] = useState<string>('');
+
+  // Form states
+  const [nmapTarget, setNmapTarget] = useState('127.0.0.1');
+  const [apkPath, setApkPath] = useState('');
+  const [scrapeUrl, setScrapeUrl] = useState('');
+
+  const [copied, setCopied] = useState(false);
+  const [b64OneLiner, setB64OneLiner] = useState('');
+
+  useEffect(() => {
+    try {
+      const b64 = btoa(TERMUX_AGENT_SCRIPT);
+      setB64OneLiner(`echo "${b64}" | base64 -d > agent.sh && bash agent.sh`);
+    } catch(e) {
+      console.error(e);
+    }
+  }, []);
+
+  const checkConnection = async () => {
+    if (!apiUrl.startsWith('http')) {
+      alert("Masukkan URL yang valid (harus diawali https://)");
+      return;
+    }
+    setLoading(true);
+    try {
+      const url = new URL(apiUrl);
+      const res = await fetch(`${url.origin}/api/ping`);
+      if (res.ok) setIsConnected(true);
+      else setIsConnected(false);
+    } catch (e) {
+      setIsConnected(false);
+    }
+    setLoading(false);
+  };
+
+  const executeCommand = async (cmd: string, title: string) => {
+    if (!isConnected || !apiUrl) {
+      alert("Hubungkan ke Termux Agent terlebih dahulu di menu Setup!");
+      return;
+    }
+    
+    setTerminalOutput(`> Executing: ${title}\n> Command: ${cmd}\n\nLoading...`);
+    setActiveTab('terminal');
+
+    try {
+      const url = new URL(apiUrl);
+      const res = await fetch(`${url.origin}/api/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command: cmd })
+      });
+      
+      const data = await res.json();
+      const errorStr = data.error ? "[ERROR]\n" + data.error : "";
+      setTerminalOutput(`> Executing: ${title}\n> Command: ${cmd}\n\n${data.output || ''}\n${errorStr}`);
+    } catch (e: any) {
+      setTerminalOutput(`> Failed to send command to Termux.\n> Error: ${e.message}`);
+    }
+  };
+
+  const copyScript = () => {
+    navigator.clipboard.writeText(b64OneLiner);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-200 font-sans flex">
+      {/* Sidebar */}
+      <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col hidden md:flex">
+        <div className="p-4 border-b border-slate-800 flex items-center gap-3">
+          <Terminal className="text-emerald-400 h-6 w-6" />
+          <h1 className="font-bold text-white tracking-tight">Termux Web UI</h1>
+        </div>
+        
+        <nav className="p-4 flex-1 space-y-1">
+          <MenuBtn icon={<Settings />} id="setup" label="Setup & Koneksi" active={activeTab} set={setActiveTab} />
+          <MenuBtn icon={<Wifi />} id="network" label="Network Scanner" active={activeTab} set={setActiveTab} />
+          <MenuBtn icon={<Globe />} id="scraper" label="Web Scraper" active={activeTab} set={setActiveTab} />
+          <MenuBtn icon={<Cpu />} id="apk" label="APK Analyzer" active={activeTab} set={setActiveTab} />
+          <MenuBtn icon={<Activity />} id="terminal" label="Terminal Output" active={activeTab} set={setActiveTab} />
+        </nav>
+
+        <div className="p-4 border-t border-slate-800 bg-slate-900">
+          <div className="flex items-center gap-2 text-sm">
+            {isConnected === true && <><CheckCircle2 className="h-4 w-4 text-emerald-500"/> <span className="text-emerald-500 font-medium">Agent Connected</span></>}
+            {isConnected === false && <><XCircle className="h-4 w-4 text-rose-500"/> <span className="text-rose-500 font-medium">Agent Offline</span></>}
+            {isConnected === null && <><div className="h-2 w-2 rounded-full bg-slate-600 m-1"/> <span className="text-slate-500">Not Checked</span></>}
+          </div>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col h-screen overflow-hidden">
+        {/* Mobile Header */}
+        <div className="md:hidden bg-slate-900 p-4 border-b border-slate-800 flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <Terminal className="text-emerald-400 h-5 w-5" />
+            <span className="font-bold text-white">TermuxUI</span>
+          </div>
+          <select 
+            className="bg-slate-800 border border-slate-700 rounded text-sm p-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            value={activeTab}
+            onChange={(e) => setActiveTab(e.target.value)}
+          >
+            <option value="setup">Setup & Koneksi</option>
+            <option value="network">Network Scanner</option>
+            <option value="scraper">Web Scraper</option>
+            <option value="apk">APK Analyzer</option>
+            <option value="terminal">Terminal Output</option>
+          </select>
+        </div>
+
+        <div className="flex-1 overflow-auto p-4 sm:p-8">
+          <div className="max-w-4xl mx-auto space-y-6">
+            
+            {/* SETUP TAB */}
+            {activeTab === 'setup' && (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-white mb-2">Penjelasan Error Anda</h2>
+                  <div className="bg-rose-500/10 border border-rose-500/30 text-rose-200 p-4 rounded-xl text-sm leading-relaxed">
+                    Error <code className="text-rose-400 font-mono">SyntaxError: invalid decimal literal</code> (dengan \`min-height: 100vh\`) terjadi karena URL <em>AI Studio / Web UI</em> ini dikunci dengan <strong>Halaman Login Proxy</strong>. <br/><br/>
+                    Saat Termux Anda menjalankan <code className="text-rose-400">curl</code>, ia malah mendownload halaman HTML Login tersebut, BUKAN mendownload kode Python-nya. Itulah kenapa Python menjadi error!
+                  </div>
+                </div>
+
+                <div className="mt-8">
+                  <h2 className="text-xl font-bold text-white mb-3 flex items-center gap-2">
+                    <CheckCircle2 className="text-emerald-400 w-6 h-6" /> Solusi Terbaik: Base64 + Auto-Tunnel
+                  </h2>
+                  <p className="text-slate-400 text-sm">Kembali ke konsep awal (Termux sebagai server), namun agar web (berbasis HTTPS) ini bisa menghubungi Termux Anda <strong>tanpa diblokir oleh sistem Mixed Content maupun Proxy</strong>, kita akan membangun komunikasi lewat <strong className="text-emerald-400">Tunnel Cloudflare gratis</strong>.</p>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+                    <h3 className="font-semibold text-white flex items-center gap-2"><Terminal className="w-5 h-5 text-emerald-400"/> 1. Copy-Paste Script Termux</h3>
+                    <div className="text-sm text-slate-400">
+                      <p>Copy script panjang di bawah ini (sudah dikodekan ke Base64 agar tidak perlu memakai jaringan/curl), lalu paste dan Enter di Termux:</p>
+                    </div>
+                    
+                    <div className="bg-black/50 rounded-xl border border-slate-800 overflow-hidden relative">
+                      <button onClick={copyScript} className="absolute top-2 right-2 text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded flex items-center gap-2 text-white shadow">
+                        {copied ? <CheckCircle2 className="w-3 h-3 text-emerald-400"/> : <Copy className="w-3 h-3"/>}
+                        {copied ? 'Copied' : 'Copy Script'}
+                      </button>
+                      <pre className="p-4 pt-12 text-[10px] sm:text-xs font-mono text-emerald-400 overflow-x-auto whitespace-pre-wrap break-all max-h-48 overflow-y-auto">
+                        {b64OneLiner || 'Loading...'}
+                      </pre>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+                    <h3 className="font-semibold text-white flex items-center gap-2"><Globe className="w-5 h-5 text-blue-400"/> 2. Masukkan URL Cloudflare</h3>
+                    <div className="text-sm text-slate-400">
+                      <p>Setelah script di samping berjalan, perhatikan Log Termux. Anda akan menemukan link acak dengan format <code className="text-emerald-400 font-mono">https://xxxxxx.trycloudflare.com</code>.</p>
+                      <p className="mt-2 text-xs text-amber-500">Mungkin Anda perlu menunggu 5-10 detik agar link Cloudflare tsb muncul.</p>
+                    </div>
+                    <div className="space-y-3">
+                      <input 
+                        type="text" 
+                        value={apiUrl}
+                        onChange={(e) => setApiUrl(e.target.value.trim())}
+                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 text-slate-200"
+                        placeholder="https://xxxxx.trycloudflare.com"
+                      />
+                      <button 
+                        onClick={checkConnection}
+                        disabled={loading || !apiUrl}
+                        className="w-full bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-3 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        {loading ? <Activity className="w-4 h-4 animate-spin"/> : 'Connect to Termux'}
+                      </button>
+                    </div>
+
+                    {isConnected === true && (
+                      <div className="mt-3 p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-lg flex items-center gap-2 text-sm font-medium">
+                        <CheckCircle2 className="h-5 w-5 shrink-0"/> Berhasil Terhubung ke Termux!
+                      </div>
+                    )}
+                    {isConnected === false && (
+                      <div className="mt-3 p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-lg flex items-start gap-2 text-sm font-medium">
+                        <XCircle className="h-5 w-5 shrink-0 mt-0.5"/> Gagal. Pastikan URL Cloudflare tertulis benar tanpa spasi, dan Termux tidak error.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* NETWORK SCANNER TAB */}
+            {activeTab === 'network' && (
+              <div className="space-y-6 fade-in">
+                <Header title="Network Scanner" desc="Jalankan NMAP dari Termux" icon={<Wifi className="text-blue-400"/>} />
+                
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-5">
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1.5">Target IP / Domain</label>
+                    <input 
+                      type="text" value={nmapTarget} onChange={(e) => setNmapTarget(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      placeholder="contoh: 192.168.1.0/24 atau google.com"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <ActionBtn onClick={() => executeCommand(`nmap -sn ${nmapTarget}`, 'Quick Ping Scan')} label="1. Quick Ping Scan" />
+                    <ActionBtn onClick={() => executeCommand(`nmap -p 1-1000 ${nmapTarget}`, 'Top 1000 Ports Scan')} label="2. Port Scan" />
+                    <ActionBtn onClick={() => executeCommand(`nmap -sV --version-intensity 5 ${nmapTarget}`, 'Service Detection')} label="3. Service Detect" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* WEB SCRAPER TAB */}
+            {activeTab === 'scraper' && (
+              <div className="space-y-6 fade-in">
+                <Header title="Web Scraper CLI" desc="Ambil metadata dan HTML info via API Termux" icon={<Globe className="text-purple-400"/>} />
+                
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-5">
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1.5">Target URL</label>
+                    <input 
+                      type="text" value={scrapeUrl} onChange={(e) => setScrapeUrl(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                      placeholder="https://example.com"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <ActionBtn 
+                      onClick={() => executeCommand(`python3 -c "import requests, bs4; soup=bs4.BeautifulSoup(requests.get('${scrapeUrl}').text, 'html.parser'); print('Title:', soup.title.string); print('Description:', soup.find('meta', attrs={'name': 'description'})['content'] if soup.find('meta', attrs={'name': 'description'}) else 'None'); print('\\nH1:', [h.text for h in soup.find_all('h1')])"`, 'Basic HTML Info')} 
+                      label="1. Extract Basic Info" 
+                    />
+                    <ActionBtn 
+                      onClick={() => executeCommand(`python3 -c "import requests, bs4; soup=bs4.BeautifulSoup(requests.get('${scrapeUrl}').text, 'html.parser'); [print(a.text.strip(), '->', a.get('href')) for a in soup.find_all('a', href=True)][:30]"`, 'Extract Links')} 
+                      label="2. Extract Links (Top 30)" 
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* APK ANALYZER TAB */}
+            {activeTab === 'apk' && (
+              <div className="space-y-6 fade-in">
+                <Header title="APK Analyzer" desc="Baca file manifest dan permission dari Termux" icon={<Cpu className="text-amber-400"/>} />
+                
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-5">
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1.5">Path File APK / Package Name</label>
+                    <input 
+                      type="text" value={apkPath} onChange={(e) => setApkPath(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                      placeholder="/sdcard/Download/app.apk atau com.termux"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <ActionBtn onClick={() => executeCommand(`dumpsys package ${apkPath} | grep -i permission`, 'Cek Permission')} label="1. Cek Permission (Dumpsys)" />
+                    <ActionBtn onClick={() => executeCommand(`aapt dump badging "${apkPath}"`, 'AAPT Dump APK Info')} label="2. Dump AAPT Informasi APK" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TERMINAL UI */}
+            {activeTab === 'terminal' && (
+              <div className="space-y-4 h-full flex flex-col fade-in">
+                <div className="flex items-center justify-between">
+                   <Header title="Terminal Output" desc="Hasil eksekusi command line" icon={<Terminal className="text-emerald-400"/>} />
+                   <button onClick={() => setTerminalOutput('')} className="text-xs text-slate-400 hover:text-white px-3 py-1 bg-slate-900 rounded border border-slate-800 transition-colors">Clear</button>
+                </div>
+                
+                <div className="bg-slate-950 rounded-xl border border-slate-800 flex-1 min-h-[400px] overflow-hidden p-1 shadow-inner relative">
+                    <div className="absolute top-0 left-0 w-full bg-slate-900 border-b border-slate-800 h-8 flex items-center px-4 gap-2 z-10">
+                      <div className="w-3 h-3 rounded-full bg-rose-500"></div>
+                      <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+                      <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
+                      <span className="text-xs text-slate-500 mx-auto font-mono">bash@termux-agent</span>
+                    </div>
+
+                    <div className="h-full pt-10 px-4 pb-4 overflow-y-auto">
+                      {terminalOutput ? (
+                        <pre className="font-mono text-sm leading-relaxed text-emerald-400 whitespace-pre-wrap">
+                          {terminalOutput}
+                        </pre>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center h-full text-slate-600 opacity-50 space-y-3">
+                          <Activity className="h-12 w-12" />
+                          <p className="font-mono text-sm">Belum ada output (C2 Idle)</p>
+                        </div>
+                      )}
+                    </div>
+                </div>
+              </div>
+            )}
+
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+function MenuBtn({ icon, label, id, active, set }: any) {
+  const isActive = active === id;
+  return (
+    <button 
+      onClick={() => set(id)}
+      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200
+      ${isActive ? 'bg-slate-800 text-white font-medium' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}`}
+    >
+      <div className={`${isActive ? 'text-emerald-400' : ''}`}>{React.cloneElement(icon, { className: "h-5 w-5" })}</div>
+      {label}
+    </button>
+  );
+}
+
+function Header({ title, desc, icon }: any) {
+  return (
+    <div>
+      <h2 className="text-2xl font-bold flex items-center gap-3 text-white mb-1">
+        {icon}
+        {title}
+      </h2>
+      <p className="text-slate-400">{desc}</p>
+    </div>
+  );
+}
+
+function ActionBtn({ label, onClick }: any) {
+  return (
+    <button 
+      onClick={onClick}
+      className="bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 text-slate-200 px-4 py-3 rounded-lg text-sm text-left transition-all duration-200 flex items-center justify-between group"
+    >
+      <span className="font-medium">{label}</span>
+      <Play className="h-4 w-4 text-slate-500 group-hover:text-emerald-400 transition-colors" />
+    </button>
+  );
+}
