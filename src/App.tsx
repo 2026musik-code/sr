@@ -114,7 +114,7 @@ cloudflared tunnel --url http://127.0.0.1:5000
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('setup');
-  const [apiUrl, setApiUrl] = useState('');
+  const [apiUrl, setApiUrl] = useState(() => localStorage.getItem('termux_api_url') || '');
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
   const [terminalOutput, setTerminalOutput] = useState<string>('');
@@ -134,7 +134,24 @@ export default function App() {
     } catch(e) {
       console.error(e);
     }
+    
+    // Auto restore connection if URL exists in localStorage
+    const savedUrl = localStorage.getItem('termux_api_url');
+    if (savedUrl) {
+      verifyConnection(savedUrl);
+    }
   }, []);
+
+  const verifyConnection = async (urlStr: string) => {
+    try {
+      const url = new URL(urlStr);
+      const res = await fetch(`${url.origin}/api/ping`);
+      if (res.ok) setIsConnected(true);
+      else setIsConnected(false);
+    } catch (e) {
+      setIsConnected(false);
+    }
+  };
 
   const checkConnection = async () => {
     if (!apiUrl.startsWith('http')) {
@@ -145,8 +162,12 @@ export default function App() {
     try {
       const url = new URL(apiUrl);
       const res = await fetch(`${url.origin}/api/ping`);
-      if (res.ok) setIsConnected(true);
-      else setIsConnected(false);
+      if (res.ok) {
+        setIsConnected(true);
+        localStorage.setItem('termux_api_url', apiUrl);
+      } else {
+        setIsConnected(false);
+      }
     } catch (e) {
       setIsConnected(false);
     }
@@ -263,7 +284,7 @@ export default function App() {
                     <div className="bg-black/50 rounded-xl border border-slate-800 overflow-hidden relative">
                       <button onClick={copyScript} className="absolute top-2 right-2 text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded flex items-center gap-2 text-white shadow">
                         {copied ? <CheckCircle2 className="w-3 h-3 text-emerald-400"/> : <Copy className="w-3 h-3"/>}
-                        {copied ? 'Copied' : 'Copy Script'}
+                        <span>{copied ? 'Copied' : 'Copy Script'}</span>
                       </button>
                       <pre className="p-4 pt-12 text-[10px] sm:text-xs font-mono text-emerald-400 overflow-x-auto whitespace-pre-wrap break-all max-h-48 overflow-y-auto">
                         {b64OneLiner || 'Loading...'}
@@ -296,12 +317,12 @@ export default function App() {
 
                     {isConnected === true && (
                       <div className="mt-3 p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-lg flex items-center gap-2 text-sm font-medium">
-                        <CheckCircle2 className="h-5 w-5 shrink-0"/> Berhasil Terhubung ke Termux!
+                        <CheckCircle2 className="h-5 w-5 shrink-0"/> <span>Berhasil Terhubung ke Termux!</span>
                       </div>
                     )}
                     {isConnected === false && (
                       <div className="mt-3 p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-lg flex items-start gap-2 text-sm font-medium">
-                        <XCircle className="h-5 w-5 shrink-0 mt-0.5"/> Gagal. Pastikan URL Cloudflare tertulis benar tanpa spasi, dan Termux tidak error.
+                        <XCircle className="h-5 w-5 shrink-0 mt-0.5"/> <span>Gagal. Pastikan URL Cloudflare tertulis benar tanpa spasi, dan Termux tidak error.</span>
                       </div>
                     )}
                   </div>
