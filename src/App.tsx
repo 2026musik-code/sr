@@ -228,11 +228,11 @@ ps aux 2>/dev/null | awk 'NR>1 {print $2"|"$3"|"$4"|"$11}' | sort -t'|' -k2 -nr 
       const url = new URL(apiUrl);
       const cmd = `
 echo "_BATTERY_"
-termux-battery-status 2>/dev/null
+timeout 5 termux-battery-status 2>&1
 echo "_WIFI_"
-termux-wifi-connectioninfo 2>/dev/null
+timeout 5 termux-wifi-connectioninfo 2>&1
 echo "_CLIPBOARD_"
-termux-clipboard-get 2>/dev/null
+timeout 3 termux-clipboard-get 2>&1
       `;
       const res = await fetch(`${url.origin}/api/execute`, {
         method: 'POST',
@@ -245,18 +245,35 @@ termux-clipboard-get 2>/dev/null
          const sections = out.split(/_(BATTERY|WIFI|CLIPBOARD)_/).map((s: string) => s.trim());
          const newDeviceData = {...deviceData};
          
-         try {
-           const batStr = sections[sections.indexOf('BATTERY') + 1];
-           if (batStr) newDeviceData.battery = JSON.parse(batStr);
-         } catch(e) {}
+         const parseJsonSafe = (str: string) => {
+           if(!str) return null;
+           const match = str.match(/\{[\s\S]*\}/);
+           if (match) {
+             try { return JSON.parse(match[0]); } catch(e) { return { _rawError: str }; }
+           }
+           return { _rawError: str };
+         };
+
+         const batSection = sections[sections.indexOf('BATTERY') + 1];
+         if (batSection) {
+           const parsed = parseJsonSafe(batSection);
+           newDeviceData.battery = parsed || { _rawError: "Kosong" };
+         }
          
-         try {
-           const wifiStr = sections[sections.indexOf('WIFI') + 1];
-           if (wifiStr) newDeviceData.wifi = JSON.parse(wifiStr);
-         } catch(e) {}
+         const wifiSection = sections[sections.indexOf('WIFI') + 1];
+         if (wifiSection) {
+           const parsed = parseJsonSafe(wifiSection);
+           newDeviceData.wifi = parsed || { _rawError: "Kosong" };
+         }
          
-         const clipStr = sections[sections.indexOf('CLIPBOARD') + 1];
-         if (clipStr) newDeviceData.clipboard = clipStr;
+         const clipSection = sections[sections.indexOf('CLIPBOARD') + 1];
+         if (clipSection !== undefined) {
+           const cleaned = clipSection.trim();
+           newDeviceData.clipboard = cleaned.length > 0 ? cleaned : null;
+           if (cleaned.includes("command not found") || cleaned.includes("timeout")) {
+               newDeviceData.clipboard = "< Output Gagal (Pastikan termux-api terinstall) >\\n" + cleaned;
+           }
+         }
          
          setDeviceData(newDeviceData);
       }
@@ -718,30 +735,41 @@ termux-clipboard-get 2>/dev/null
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   {/* Baterai Card */}
-                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm">
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm flex flex-col">
                     <h3 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2"><Battery className="w-4 h-4 text-emerald-400" /> Baterai HP</h3>
                     {deviceData.battery ? (
-                      <div className="space-y-3">
-                         <div className="flex items-end gap-3">
-                           <span className="text-3xl font-bold text-white">{deviceData.battery.percentage}%</span>
-                           <span className="text-sm text-slate-400 pb-1 uppercase">{deviceData.battery.status}</span>
-                         </div>
-                         <div className="flex justify-between text-xs text-slate-400">
-                           <span>Suhu: {deviceData.battery.temperature}°C</span>
-                           <span>Health: {deviceData.battery.health}</span>
-                           <span>Power: {deviceData.battery.plugged}</span>
-                         </div>
-                         <div className="w-full bg-slate-950 rounded-full h-2.5 overflow-hidden border border-slate-800">
-                           <div className={`h-full rounded-full transition-all duration-500 ${deviceData.battery.percentage > 20 ? 'bg-emerald-500' : 'bg-rose-500'}`} style={{ width: `${deviceData.battery.percentage}%` }}></div>
-                         </div>
-                      </div>
-                    ) : <div className="text-sm text-slate-500 py-2">Pastikan aplikasi <b>Termux:API</b> terinstall di PlayStore / F-Droid, lalu jalankan <code className="text-emerald-400">pkg install termux-api</code> di termux.</div>}
+                      deviceData.battery._rawError ? (
+                        <div className="text-xs text-rose-400 p-3 bg-slate-950 rounded-lg border border-slate-800 whitespace-pre-wrap flex-1">
+                           <span className="font-semibold text-rose-300">Gagal Mengambil Data:</span><br/>
+                           {deviceData.battery._rawError.substring(0, 150)}{deviceData.battery._rawError.length > 150 ? '...' : ''}
+                           <div className="mt-3 text-slate-400 font-sans">
+                             Pastikan aplikasi <b>Termux:API</b> terinstall, dan jalankan: <br/>
+                             <code className="text-emerald-400 select-all block mt-1">pkg install termux-api</code>
+                           </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                           <div className="flex items-end gap-3">
+                             <span className="text-3xl font-bold text-white">{deviceData.battery.percentage}%</span>
+                             <span className="text-sm text-slate-400 pb-1 uppercase">{deviceData.battery.status}</span>
+                           </div>
+                           <div className="flex justify-between text-xs text-slate-400">
+                             <span>Suhu: {deviceData.battery.temperature}°C</span>
+                             <span>Health: {deviceData.battery.health}</span>
+                             <span>Power: {deviceData.battery.plugged}</span>
+                           </div>
+                           <div className="w-full bg-slate-950 rounded-full h-2.5 overflow-hidden border border-slate-800">
+                             <div className={`h-full rounded-full transition-all duration-500 ${deviceData.battery.percentage > 20 ? 'bg-emerald-500' : 'bg-rose-500'}`} style={{ width: `${deviceData.battery.percentage}%` }}></div>
+                           </div>
+                        </div>
+                      )
+                    ) : <div className="text-sm text-slate-500 py-2">Tekan Refresh Data untuk memuat.</div>}
                   </div>
 
                   {/* Clipboard Card */}
                   <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm flex flex-col min-h-0">
                     <h3 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2"><ClipboardIcon className="w-4 h-4 text-amber-400" /> Clipboard Saat Ini</h3>
-                    <div className="bg-slate-950 border border-slate-800 rounded-lg p-3 text-sm text-slate-300 flex-1 overflow-y-auto whitespace-pre-wrap">
+                    <div className="bg-slate-950 border border-slate-800 rounded-lg p-3 text-sm text-slate-300 flex-1 overflow-y-auto whitespace-pre-wrap min-h-[100px]">
                       {deviceData.clipboard !== null ? (deviceData.clipboard || '< Clipboard Kosong >') : 'Tekan Refresh Data...'}
                     </div>
                   </div>
@@ -753,18 +781,18 @@ termux-clipboard-get 2>/dev/null
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                      <div className="flex gap-2">
                         <input type="text" value={toastMsg} onChange={(e) => setToastMsg(e.target.value)} placeholder="Teks notif..." className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none"/>
-                        <button onClick={() => executeCommand(`termux-toast "${toastMsg}"`, 'Show Toast')} className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-sm transition flex items-center justify-center gap-1.5"><MessageSquare className="w-4 h-4"/> Toast</button>
+                        <button onClick={() => executeSilentCommand(`termux-toast "${toastMsg}"`)} className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-sm transition flex items-center justify-center gap-1.5"><MessageSquare className="w-4 h-4"/> Toast</button>
                      </div>
                      <div className="flex gap-2">
-                        <button onClick={() => executeCommand(`termux-vibrate -d 500`, 'Getarkan')} className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-sm transition flex items-center justify-center gap-2"><Bell className="w-4 h-4"/> Getar</button>
-                        <button onClick={() => executeCommand(`termux-torch on`, 'Senter ON')} className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-sm transition flex items-center justify-center gap-2"><Zap className="w-4 h-4"/> Senter ON</button>
-                        <button onClick={() => executeCommand(`termux-torch off`, 'Senter OFF')} className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-sm transition text-center">OFF</button>
+                        <button onClick={() => executeSilentCommand(`termux-vibrate -d 500`)} className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-sm transition flex items-center justify-center gap-2"><Bell className="w-4 h-4"/> Getar</button>
+                        <button onClick={() => executeSilentCommand(`termux-torch on`)} className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-sm transition flex items-center justify-center gap-2"><Zap className="w-4 h-4"/> Senter ON</button>
+                        <button onClick={() => executeSilentCommand(`termux-torch off`)} className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-sm transition text-center">OFF</button>
                      </div>
                      <div className="flex gap-2 sm:col-span-2">
                         <input type="text" id="ttsInput" placeholder="Teks untuk diucapkan HP..." className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none"/>
                         <button onClick={() => {
                           const val = (document.getElementById('ttsInput') as HTMLInputElement).value;
-                          if(val) executeCommand(`termux-tts-speak "${val}"`, 'Text to Speech');
+                          if(val) executeSilentCommand(`termux-tts-speak "${val}"`);
                         }} className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-lg text-sm transition flex items-center justify-center gap-2"><Volume2 className="w-4 h-4"/> Ucapkan Suara</button>
                      </div>
                   </div>
