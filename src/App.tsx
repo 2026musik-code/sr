@@ -372,16 +372,24 @@ timeout 3 termux-clipboard-get 2>&1
   };
 
   const executeSilentCommand = async (cmd: string) => {
-    if (!isConnected || !apiUrl) return;
+    if (!isConnected || !apiUrl) {
+      alert("Status belum terhubung ke Termux! Silakan connect di menu Setup.");
+      return;
+    }
     try {
       const url = new URL(apiUrl);
-      await fetch(`${url.origin}/api/execute`, {
+      const res = await fetch(`${url.origin}/api/execute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ command: cmd })
+        body: JSON.stringify({ command: `${cmd} 2>&1` })
       });
+      const data = await res.json();
+      if (data.error || (data.output && data.output.toLowerCase().includes('not found'))) {
+        alert("Gagal menjalankan perintah (Pastikan termux-api terinstall):\n" + (data.error || data.output));
+      }
     } catch (e) {
       console.error("Silent Exec Error:", e);
+      alert("Koneksi terputus dengan server Termux.");
     }
   };
 
@@ -795,19 +803,19 @@ timeout 3 termux-clipboard-get 2>&1
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                      <div className="flex gap-2">
                         <input type="text" value={toastMsg} onChange={(e) => setToastMsg(e.target.value)} placeholder="Teks notif..." className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none"/>
-                        <button onClick={() => executeSilentCommand(`termux-toast "${toastMsg}"`)} className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-sm transition flex items-center justify-center gap-1.5"><MessageSquare className="w-4 h-4"/> Toast</button>
+                        <button onClick={() => executeSilentCommand(`termux-toast "${toastMsg}"`)} className="bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 px-3 py-2 rounded-lg text-sm transition flex items-center justify-center gap-1.5"><MessageSquare className="w-4 h-4"/> Toast</button>
                      </div>
                      <div className="flex gap-2">
-                        <button onClick={() => executeSilentCommand(`termux-vibrate -d 500`)} className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-sm transition flex items-center justify-center gap-2"><Bell className="w-4 h-4"/> Getar</button>
-                        <button onClick={() => executeSilentCommand(`termux-torch on`)} className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-sm transition flex items-center justify-center gap-2"><Zap className="w-4 h-4"/> Senter ON</button>
-                        <button onClick={() => executeSilentCommand(`termux-torch off`)} className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-sm transition text-center">OFF</button>
+                        <button onClick={() => executeSilentCommand(`termux-vibrate -d 500`)} className="flex-1 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 px-3 py-2 rounded-lg text-sm transition flex items-center justify-center gap-2"><Bell className="w-4 h-4"/> Getar</button>
+                        <button onClick={() => executeSilentCommand(`termux-torch on`)} className="flex-1 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 px-3 py-2 rounded-lg text-sm transition flex items-center justify-center gap-2"><Zap className="w-4 h-4"/> Senter ON</button>
+                        <button onClick={() => executeSilentCommand(`termux-torch off`)} className="bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 px-3 py-2 rounded-lg text-sm transition text-center">OFF</button>
                      </div>
                      <div className="flex gap-2 sm:col-span-2">
                         <input type="text" id="ttsInput" placeholder="Teks untuk diucapkan HP..." className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none"/>
                         <button onClick={() => {
                           const val = (document.getElementById('ttsInput') as HTMLInputElement).value;
                           if(val) executeSilentCommand(`termux-tts-speak "${val}"`);
-                        }} className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-lg text-sm transition flex items-center justify-center gap-2"><Volume2 className="w-4 h-4"/> Ucapkan Suara</button>
+                        }} className="bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 px-4 py-2 rounded-lg text-sm transition flex items-center justify-center gap-2"><Volume2 className="w-4 h-4"/> Ucapkan Suara</button>
                      </div>
                   </div>
                 </div>
