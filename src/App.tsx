@@ -416,25 +416,32 @@ export default function App() {
             {/* FILE MANAGER TAB */}
             {activeTab === 'files' && (
               <div className="space-y-6 fade-in h-[calc(100vh-140px)] flex flex-col">
-                <Header title="File Manager" desc="Jelajahi file Termux (Peringatan: Root tidak didukung)" icon={<Folder className="text-yellow-400"/>} />
+                <Header title="File Manager" desc="Jelajahi file Termux (Pastikan sudah izinkan akses storage: termux-setup-storage)" icon={<Folder className="text-yellow-400"/>} />
                 <div className="bg-slate-900 border border-slate-800 rounded-xl flex-1 flex flex-col min-h-0">
-                  <div className="p-4 border-b border-slate-800 flex gap-2 items-center shrink-0">
-                    <input 
-                      type="text" value={filePath} onChange={(e) => setFilePath(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && loadDirectory(filePath)}
-                      className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 text-sm focus:outline-none focus:ring-1 focus:ring-yellow-500"
-                    />
-                    <button onClick={() => loadDirectory(filePath)} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition cursor-pointer">
-                      Load
-                    </button>
-                    <button 
-                      onClick={() => {
-                         const parent = currentPathDisplay.split('/').slice(0, -1).join('/') || '/';
-                         loadDirectory(parent);
-                      }} 
-                      className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-2.5 rounded-lg text-sm transition cursor-pointer">
-                      Up
-                    </button>
+                  <div className="p-4 border-b border-slate-800 flex flex-col sm:flex-row gap-2 sm:items-center shrink-0">
+                    <div className="flex gap-2 mb-2 sm:mb-0">
+                       <button onClick={() => loadDirectory('/sdcard')} className="bg-slate-800 hover:bg-slate-700 text-xs px-3 py-1.5 rounded text-slate-300">/sdcard</button>
+                       <button onClick={() => loadDirectory('/data/data/com.termux/files/home')} className="bg-slate-800 hover:bg-slate-700 text-xs px-3 py-1.5 rounded text-slate-300">Home (~)</button>
+                    </div>
+                    <div className="flex flex-1 gap-2">
+                      <input 
+                        type="text" value={filePath} onChange={(e) => setFilePath(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && loadDirectory(filePath)}
+                        className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 text-sm focus:outline-none focus:ring-1 focus:ring-yellow-500"
+                      />
+                      <button onClick={() => loadDirectory(filePath)} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition cursor-pointer">
+                        Load
+                      </button>
+                      <button 
+                        onClick={() => {
+                           let parent = currentPathDisplay.split('/').filter(Boolean).slice(0, -1).join('/');
+                           parent = parent ? `/${parent}` : '/';
+                           loadDirectory(parent);
+                        }} 
+                        className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-2.5 rounded-lg text-sm transition cursor-pointer">
+                        Up
+                      </button>
+                    </div>
                   </div>
                   
                   <div className="flex-1 overflow-y-auto p-2">
@@ -444,14 +451,22 @@ export default function App() {
                       </div>
                     ) : (
                       fileList.length === 0 ? (
-                        <div className="flex items-center justify-center p-8 text-slate-500 text-sm">Folder kosong atau tidak dapat diakses. (Coba load terlebih dahulu)</div>
+                        <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+                           <div className="text-slate-500 text-sm mb-2">Folder kosong, akses ditolak, atau path tidak valid.</div>
+                           {(currentPathDisplay.includes('sdcard') || currentPathDisplay === '/') && (
+                             <button onClick={() => executeCommand('termux-setup-storage', 'Setup Storage')} className="mt-2 text-xs bg-slate-800 hover:bg-slate-700 text-yellow-400 px-4 py-2 rounded">
+                               Jalankan termux-setup-storage (Lalu klik Izinkan di HP)
+                             </button>
+                           )}
+                        </div>
                       ) : (
                         <ul className="space-y-1">
                           {fileList.map((f, i) => (
                             <li key={i} className="group flex items-center justify-between p-2.5 hover:bg-slate-800/50 rounded-lg cursor-pointer transition"
                                 onClick={() => {
                                    if(f.isDir) {
-                                     const newPath = currentPathDisplay.endsWith('/') ? `${currentPathDisplay}${f.name}` : `${currentPathDisplay}/${f.name}`;
+                                     const basePath = currentPathDisplay === '/' ? '' : currentPathDisplay;
+                                     const newPath = `${basePath}/${f.name}`.replace(/\/\//g, '/');
                                      loadDirectory(newPath);
                                    }
                                 }}>
