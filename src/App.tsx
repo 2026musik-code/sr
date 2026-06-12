@@ -371,6 +371,20 @@ timeout 3 termux-clipboard-get 2>&1
     }
   };
 
+  const executeSilentCommand = async (cmd: string) => {
+    if (!isConnected || !apiUrl) return;
+    try {
+      const url = new URL(apiUrl);
+      await fetch(`${url.origin}/api/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command: cmd })
+      });
+    } catch (e) {
+      console.error("Silent Exec Error:", e);
+    }
+  };
+
   const loadDirectory = async (targetPath: string) => {
     if (!isConnected || !apiUrl) return;
     setFileLoading(true);
