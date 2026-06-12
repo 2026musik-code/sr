@@ -138,9 +138,91 @@ export default function App() {
   const [fileLoading, setFileLoading] = useState(false);
   const [currentPathDisplay, setCurrentPathDisplay] = useState('/sdcard');
 
+  const [sysLoading, setSysLoading] = useState(false);
+  const [sysData, setSysData] = useState<{
+    storage: { total: string, used: string, free: string, percent: number } | null,
+    ram: { total: number, used: number, percent: number } | null,
+    uptime: string | null,
+    top: { pid: string, cpu: string, mem: string, cmd: string }[] | null
+  }>({ storage: null, ram: null, uptime: null, top: null });
+
+  const loadSystemInfo = async () => {
+    if (!isConnected || !apiUrl) return;
+    setSysLoading(true);
+    try {
+      const url = new URL(apiUrl);
+      const cmd = `
+echo "_STORAGE_"
+df -h | grep -m 1 -e "/data$" -e "/storage/emulated/0" | awk '{print $2"|"$3"|"$4"|"$5}'
+echo "_RAM_"
+free -m 2>/dev/null | awk '/^Mem:/ {print $2"|"$3}'
+echo "_UPTIME_"
+uptime -p 2>/dev/null || uptime
+echo "_TOP_"
+ps aux 2>/dev/null | awk 'NR>1 {print $2"|"$3"|"$4"|"$11}' | sort -t'|' -k2 -nr | head -n 8
+      `;
+      const res = await fetch(`${url.origin}/api/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command: cmd })
+      });
+      const data = await res.json();
+      if (!data.error) {
+         const out = data.output;
+         const sections = out.split(/_(STORAGE|RAM|UPTIME|TOP)_/).map((s: string) => s.trim());
+         const newSysData = {...sysData};
+         
+         const storageData = sections[sections.indexOf('STORAGE') + 1];
+         if (storageData) {
+            const p = storageData.split('|');
+            if (p.length >= 4) {
+               newSysData.storage = {
+                  total: p[0], used: p[1], free: p[2], percent: parseInt(p[3].replace('%','')) || 0
+               };
+            }
+         }
+         
+         const ramData = sections[sections.indexOf('RAM') + 1];
+         if (ramData) {
+            const p = ramData.split('|');
+            if (p.length >= 2) {
+               const total = parseInt(p[0]);
+               const used = parseInt(p[1]);
+               newSysData.ram = { total, used, percent: Math.round((used/total)*100) || 0 };
+            }
+         }
+         
+         const uptimeData = sections[sections.indexOf('UPTIME') + 1];
+         if (uptimeData) {
+             newSysData.uptime = uptimeData;
+         }
+         
+         const topData = sections[sections.indexOf('TOP') + 1];
+         if (topData) {
+             const lines = topData.split('\n').filter(Boolean);
+             newSysData.top = lines.map((l: string) => {
+                 const p = l.split('|');
+                 return { pid: p[0], cpu: p[1], mem: p[2], cmd: p[3] };
+             });
+         }
+         
+         setSysData(newSysData);
+      }
+    } catch (e) {
+      console.error("Sys Info Error:", e);
+    }
+    setSysLoading(false);
+  };
+
   useEffect(() => {
     localStorage.setItem('termux_snippets', JSON.stringify(snippets));
   }, [snippets]);
+
+  useEffect(() => {
+    if (activeTab === 'system' && isConnected && !sysData.storage) {
+      loadSystemInfo();
+    }
+  }, [activeTab, isConnected]);
 
   const [copied, setCopied] = useState(false);
   const [b64OneLiner, setB64OneLiner] = useState('');
@@ -266,10 +348,10 @@ export default function App() {
     <ErrorBoundary>
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans flex">
       {/* Sidebar */}
-      <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col hidden md:flex">
+      <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col hidden md:flex shrink-0">
         <div className="p-4 border-b border-slate-800 flex items-center gap-3">
           <Terminal className="text-emerald-400 h-6 w-6" />
-          <h1 className="font-bold text-white tracking-tight text-lg">TERMUXWEB</h1>
+          <h1 className="font-bold text-white tracking-widest text-base">TERMUXWEB</h1>
         </div>
         
         <nav className="p-4 flex-1 space-y-1 overflow-y-auto">
@@ -310,10 +392,10 @@ export default function App() {
       <main className="flex-1 flex flex-col h-screen overflow-hidden">
         {/* Mobile Header */}
         <div className="md:hidden bg-slate-900 border-b border-slate-800 flex flex-col shrink-0">
-          <div className="p-3 border-b border-slate-800/50 flex justify-between items-center">
-            <div className="flex items-center gap-2">
+          <div className="p-2.5 border-b border-slate-800 flex justify-between items-center">
+            <div className="flex items-center gap-2 px-1">
               <Terminal className="text-emerald-400 h-4 w-4" />
-              <span className="font-bold text-white text-sm">TERMUXWEB</span>
+              <span className="font-bold text-white text-[13px] tracking-wide">TERMUXWEB</span>
             </div>
           </div>
           <div className="flex overflow-x-auto whitespace-nowrap p-2 gap-2 [&::-webkit-scrollbar]:hidden">
@@ -480,13 +562,86 @@ export default function App() {
             {/* SYSTEM MONITOR TAB */}
             {activeTab === 'system' && (
               <div className="space-y-6 fade-in">
-                <Header title="System Monitor" desc="Cek status CPU, RAM, & Storage" icon={<HardDrive className="text-cyan-400"/>} />
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-5">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <ActionBtn onClick={() => executeCommand(`df -h`, 'Cek Storage')} label="1. Cek Storage (df -h)" />
-                    <ActionBtn onClick={() => executeCommand(`free -m`, 'Cek RAM')} label="2. Cek RAM (free -m)" />
-                    <ActionBtn onClick={() => executeCommand(`top -n 1 -b | head -n 20`, 'Top Processes')} label="3. CPU & Top Proses (top)" />
-                    <ActionBtn onClick={() => executeCommand(`uptime`, 'Uptime')} label="4. Uptime Detail" />
+                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-slate-900 border border-slate-800 p-4 sm:p-5 rounded-xl">
+                  <div>
+                    <h2 className="text-xl font-bold text-white flex items-center gap-2"><HardDrive className="text-cyan-400 w-5 h-5"/> System Monitor</h2>
+                    <p className="text-sm text-slate-400 mt-1">Statistik Perangkat Real-time</p>
+                  </div>
+                  <button onClick={loadSystemInfo} disabled={sysLoading} className="bg-cyan-600/20 hover:bg-cyan-600 text-cyan-400 hover:text-white px-4 py-2 rounded-lg transition disabled:opacity-50 flex items-center justify-center gap-2 font-medium text-sm">
+                    <Activity className={`w-4 h-4 ${sysLoading ? 'animate-spin' : ''}`} />
+                    <span>Refresh Data</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {/* Storage Card */}
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm">
+                     <h3 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2"><HardDrive className="w-4 h-4 text-cyan-400" /> Internal Storage (/data)</h3>
+                     {sysData.storage ? (
+                       <div className="space-y-3">
+                         <div className="flex justify-between text-xs font-medium text-slate-300">
+                           <span>Terpakai: {sysData.storage.used}</span>
+                           <span>Total: {sysData.storage.total}</span>
+                         </div>
+                         <div className="w-full bg-slate-950 rounded-full h-3.5 overflow-hidden border border-slate-800">
+                           <div className="bg-cyan-500 h-full rounded-full transition-all duration-500" style={{ width: `${sysData.storage.percent}%` }}></div>
+                         </div>
+                         <div className="text-xs text-right text-slate-500">Sisa {sysData.storage.free} ({100 - sysData.storage.percent}% free)</div>
+                       </div>
+                     ) : <div className="text-sm text-slate-500 py-4 text-center">Memuat data storage...</div>}
+                  </div>
+                  
+                  {/* RAM Card */}
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm">
+                     <h3 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2"><Cpu className="w-4 h-4 text-emerald-400" /> Memory (RAM)</h3>
+                     {sysData.ram ? (
+                       <div className="space-y-3">
+                         <div className="flex justify-between text-xs font-medium text-slate-300">
+                           <span>Terpakai: {(sysData.ram.used / 1024).toFixed(1)} GB</span>
+                           <span>Total: {(sysData.ram.total / 1024).toFixed(1)} GB</span>
+                         </div>
+                         <div className="w-full bg-slate-950 rounded-full h-3.5 overflow-hidden border border-slate-800">
+                           <div className="bg-emerald-500 h-full rounded-full transition-all duration-500" style={{ width: `${sysData.ram.percent}%` }}></div>
+                         </div>
+                         <div className="text-xs text-right text-slate-500">{sysData.ram.percent}% Used</div>
+                       </div>
+                     ) : <div className="text-sm text-slate-500 py-4 text-center">Memuat data RAM...</div>}
+                  </div>
+                </div>
+
+                {/* Uptime & Top */}
+                <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm">
+                  <div className="p-4 border-b border-slate-800 flex flex-col sm:flex-row justify-between sm:items-center gap-3 bg-slate-900/50">
+                    <h3 className="text-sm font-semibold text-slate-300 flex items-center gap-2"><List className="w-4 h-4 text-orange-400" /> Top Processes</h3>
+                    <div className="text-xs bg-slate-950 px-3 py-1.5 rounded-md text-slate-300 border border-slate-800">
+                      Uptime: <span className="text-emerald-400 font-medium">{sysData.uptime || '...'}</span>
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse min-w-[400px]">
+                      <thead>
+                        <tr className="bg-slate-950/50 text-slate-500 text-xs border-b border-slate-800">
+                          <th className="font-medium p-3.5 whitespace-nowrap">PID</th>
+                          <th className="font-medium p-3.5 w-full">PROCESS COMMAND</th>
+                          <th className="font-medium p-3.5 text-right whitespace-nowrap">CPU %</th>
+                          <th className="font-medium p-3.5 text-right whitespace-nowrap">MEM %</th>
+                        </tr>
+                      </thead>
+                      <tbody className="text-sm">
+                        {sysData.top && sysData.top.length > 0 ? sysData.top.map((p, i) => (
+                          <tr key={i} className="border-b border-slate-800/50 hover:bg-slate-800/80 transition-colors">
+                            <td className="p-3.5 text-slate-500 font-mono text-xs">{p.pid}</td>
+                            <td className="p-3.5 text-slate-300">
+                               <div className="max-w-[200px] sm:max-w-xs md:max-w-md lg:max-w-lg truncate">{p.cmd}</div>
+                            </td>
+                            <td className="p-3.5 text-orange-400 font-medium text-right font-mono text-xs">{p.cpu}%</td>
+                            <td className="p-3.5 text-emerald-400 font-medium text-right font-mono text-xs">{p.mem}%</td>
+                          </tr>
+                        )) : (
+                          <tr><td colSpan={4} className="p-8 text-center text-slate-500 text-sm">Memuat daftar proses aktif...</td></tr>
+                        )}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               </div>
