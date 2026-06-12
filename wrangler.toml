@@ -1,4 +1,4 @@
-name = "termux-web-ui"
+name = "sr"
 compatibility_date = "2024-06-11"
 pages_build_output_dir = "dist"
 
