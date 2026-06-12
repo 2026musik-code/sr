@@ -2,7 +2,8 @@ import React, { useState, useEffect, Component, ErrorInfo } from 'react';
 import { 
   Terminal, Server, Globe, ShieldAlert, Cpu, 
   Wifi, Play, CheckCircle2, XCircle, Code, Copy, 
-  Activity, Settings, Info, AlertTriangle
+  Activity, Settings, Info, AlertTriangle,
+  Folder, HardDrive, Smartphone, List, Bookmark, Trash2, FileText
 } from 'lucide-react';
 
 class ErrorBoundary extends Component<{children: React.ReactNode}, {hasError: boolean, error: Error | null}> {
@@ -124,6 +125,19 @@ export default function App() {
   const [apkPath, setApkPath] = useState('');
   const [scrapeUrl, setScrapeUrl] = useState('');
 
+  // 5 New Features States
+  const [filePath, setFilePath] = useState('/sdcard');
+  const [processId, setProcessId] = useState('');
+  const [customCmd, setCustomCmd] = useState('');
+  const [customTitle, setCustomTitle] = useState('');
+  const [snippets, setSnippets] = useState<{title: string, cmd: string}[]>(() => {
+    try { return JSON.parse(localStorage.getItem('termux_snippets') || '[]'); } catch { return []; }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('termux_snippets', JSON.stringify(snippets));
+  }, [snippets]);
+
   const [copied, setCopied] = useState(false);
   const [b64OneLiner, setB64OneLiner] = useState('');
 
@@ -215,11 +229,28 @@ export default function App() {
           <h1 className="font-bold text-white tracking-tight">Termux Web UI</h1>
         </div>
         
-        <nav className="p-4 flex-1 space-y-1">
+        <nav className="p-4 flex-1 space-y-1 overflow-y-auto">
           <MenuBtn icon={<Settings />} id="setup" label="Setup & Koneksi" active={activeTab} set={setActiveTab} />
+          
+          <div className="pt-4 pb-2">
+            <p className="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">5 Fitur Baru</p>
+          </div>
+          <MenuBtn icon={<Folder />} id="files" label="File Manager" active={activeTab} set={setActiveTab} />
+          <MenuBtn icon={<HardDrive />} id="system" label="System Monitor" active={activeTab} set={setActiveTab} />
+          <MenuBtn icon={<Smartphone />} id="device" label="Termux API Control" active={activeTab} set={setActiveTab} />
+          <MenuBtn icon={<List />} id="processes" label="Process Manager" active={activeTab} set={setActiveTab} />
+          <MenuBtn icon={<Bookmark />} id="snippets" label="Custom Snippets" active={activeTab} set={setActiveTab} />
+
+          <div className="pt-4 pb-2">
+            <p className="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Lanjutan</p>
+          </div>
           <MenuBtn icon={<Wifi />} id="network" label="Network Scanner" active={activeTab} set={setActiveTab} />
           <MenuBtn icon={<Globe />} id="scraper" label="Web Scraper" active={activeTab} set={setActiveTab} />
           <MenuBtn icon={<Cpu />} id="apk" label="APK Analyzer" active={activeTab} set={setActiveTab} />
+          
+          <div className="pt-4 pb-2">
+            <p className="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Output</p>
+          </div>
           <MenuBtn icon={<Activity />} id="terminal" label="Terminal Output" active={activeTab} set={setActiveTab} />
         </nav>
 
@@ -246,9 +277,18 @@ export default function App() {
             onChange={(e) => setActiveTab(e.target.value)}
           >
             <option value="setup">Setup & Koneksi</option>
-            <option value="network">Network Scanner</option>
-            <option value="scraper">Web Scraper</option>
-            <option value="apk">APK Analyzer</option>
+            <optgroup label="5 Fitur Baru">
+              <option value="files">File Manager</option>
+              <option value="system">System Monitor</option>
+              <option value="device">Termux API Control</option>
+              <option value="processes">Process Manager</option>
+              <option value="snippets">Custom Snippets</option>
+            </optgroup>
+            <optgroup label="Lanjutan">
+              <option value="network">Network Scanner</option>
+              <option value="scraper">Web Scraper</option>
+              <option value="apk">APK Analyzer</option>
+            </optgroup>
             <option value="terminal">Terminal Output</option>
           </select>
         </div>
@@ -325,6 +365,130 @@ export default function App() {
                         <XCircle className="h-5 w-5 shrink-0 mt-0.5"/> <span>Gagal. Pastikan URL Cloudflare tertulis benar tanpa spasi, dan Termux tidak error.</span>
                       </div>
                     )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* FILE MANAGER TAB */}
+            {activeTab === 'files' && (
+              <div className="space-y-6 fade-in">
+                <Header title="File Manager" desc="Jelajahi dan atur file di Termux / SD Card" icon={<Folder className="text-yellow-400"/>} />
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-5">
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1.5">Path Direktori / File</label>
+                    <input 
+                      type="text" value={filePath} onChange={(e) => setFilePath(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 focus:outline-none focus:ring-1 focus:ring-yellow-500"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <ActionBtn onClick={() => executeCommand(`ls -la ${filePath}`, 'List Files')} label="1. Lihat Isi Folder (ls)" />
+                    <ActionBtn onClick={() => executeCommand(`cat ${filePath}`, 'Read File')} label="2. Baca File (cat)" />
+                    <ActionBtn onClick={() => executeCommand(`rm -rf ${filePath}`, 'Delete Item')} label="3. Hapus (rm -rf)" />
+                    <ActionBtn onClick={() => executeCommand(`pwd`, 'Print Working Dir')} label="4. Cek Posisi (pwd)" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* SYSTEM MONITOR TAB */}
+            {activeTab === 'system' && (
+              <div className="space-y-6 fade-in">
+                <Header title="System Monitor" desc="Cek status CPU, RAM, & Storage" icon={<HardDrive className="text-cyan-400"/>} />
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <ActionBtn onClick={() => executeCommand(`df -h`, 'Cek Storage')} label="1. Cek Storage (df -h)" />
+                    <ActionBtn onClick={() => executeCommand(`free -m`, 'Cek RAM')} label="2. Cek RAM (free -m)" />
+                    <ActionBtn onClick={() => executeCommand(`top -n 1 -b | head -n 20`, 'Top Processes')} label="3. CPU & Top Proses (top)" />
+                    <ActionBtn onClick={() => executeCommand(`uptime`, 'Uptime')} label="4. Uptime Detail" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TERMUX API TAB */}
+            {activeTab === 'device' && (
+              <div className="space-y-6 fade-in">
+                <Header title="Termux API Control" desc="Kontrol fitur HP Android (perlu install termux-api)" icon={<Smartphone className="text-pink-400"/>} />
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-5">
+                  <div className="p-3 bg-slate-950 border border-slate-800 text-slate-300 text-sm rounded-lg">
+                    Pastikan Anda sudah menginstall plugin <code>pkg install termux-api</code> di termux dan aplikasi Termux:API dari F-Droid.
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <ActionBtn onClick={() => executeCommand(`termux-battery-status`, 'Baterai Status')} label="1. Cek Status Baterai" />
+                    <ActionBtn onClick={() => executeCommand(`termux-location`, 'GPS Location')} label="2. Ambil Lokasi GPS" />
+                    <ActionBtn onClick={() => executeCommand(`termux-clipboard-get`, 'Get Clipboard')} label="3. Baca Clipboard HP" />
+                    <ActionBtn onClick={() => executeCommand(`termux-vibrate -d 1000`, 'Vibrate')} label="4. Getarkan HP (1 Detik)" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* PROCESS MANAGER TAB */}
+            {activeTab === 'processes' && (
+              <div className="space-y-6 fade-in">
+                <Header title="Process Manager" desc="Manajemen proses background" icon={<List className="text-orange-400"/>} />
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-5">
+                  <div className="grid grid-cols-1 gap-3">
+                    <ActionBtn onClick={() => executeCommand(`ps aux`, 'List All Processes')} label="1. Tampilkan Semua Proses (ps aux)" />
+                  </div>
+                  <div className="mt-6 border-t border-slate-800 pt-5">
+                    <label className="block text-sm text-slate-400 mb-1.5">Matikan Proses (Kill PID)</label>
+                    <div className="flex gap-2">
+                       <input 
+                        type="text" value={processId} onChange={(e) => setProcessId(e.target.value)}
+                        className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                        placeholder="Masukkan PID (contoh: 15432)"
+                      />
+                      <button onClick={() => executeCommand(`kill -9 ${processId}`, `Kill ${processId}`)} className="bg-rose-600 hover:bg-rose-500 text-white px-4 py-2 rounded-lg font-medium transition">Kill</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* CUSTOM SNIPPETS TAB */}
+            {activeTab === 'snippets' && (
+              <div className="space-y-6 fade-in">
+                <Header title="Custom Snippets" desc="Simpan perintah bash yang sering digunakan" icon={<Bookmark className="text-violet-400"/>} />
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-5">
+                  <div className="space-y-3 border-b border-slate-800 pb-5">
+                     <input 
+                        type="text" value={customTitle} onChange={(e) => setCustomTitle(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 focus:outline-none"
+                        placeholder="Nama/Judul Snippet (contoh: Auto Update)"
+                      />
+                      <input 
+                        type="text" value={customCmd} onChange={(e) => setCustomCmd(e.target.value)}
+                        className="w-full font-mono bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-emerald-400 focus:outline-none"
+                        placeholder="Perintah Bash (contoh: apt update && apt upgrade -y)"
+                      />
+                      <button 
+                         onClick={() => {
+                           if(customTitle && customCmd) {
+                             setSnippets([...snippets, {title: customTitle, cmd: customCmd}]);
+                             setCustomTitle(''); setCustomCmd('');
+                           }
+                         }}
+                         className="w-full bg-violet-600 hover:bg-violet-500 text-white px-4 py-2.5 rounded-lg font-medium transition"
+                      >Simpan Snippet Baru</button>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    {snippets.length === 0 && <p className="text-sm text-slate-500 text-center py-4">Belum ada snippet tersimpan.</p>}
+                    {snippets.map((snip, idx) => (
+                      <div key={idx} className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center justify-between bg-slate-950 p-3 rounded-lg border border-slate-800">
+                         <div className="flex-1 overflow-hidden">
+                           <h4 className="font-medium text-slate-200 text-sm truncate">{snip.title}</h4>
+                           <p className="font-mono text-emerald-500/70 text-xs truncate mt-1">{snip.cmd}</p>
+                         </div>
+                         <div className="flex items-center gap-2">
+                           <button onClick={() => executeCommand(snip.cmd, snip.title)} className="bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white px-3 py-1.5 rounded transition text-sm flex items-center gap-2"><Play className="w-3 h-3"/> Run</button>
+                           <button onClick={() => setSnippets(snippets.filter((_, i) => i !== idx))} className="bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white px-3 py-1.5 rounded transition"><Trash2 className="w-4 h-4"/></button>
+                         </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
