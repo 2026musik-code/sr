@@ -269,7 +269,7 @@ export default function App() {
       <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col hidden md:flex">
         <div className="p-4 border-b border-slate-800 flex items-center gap-3">
           <Terminal className="text-emerald-400 h-6 w-6" />
-          <h1 className="font-bold text-white tracking-tight">Termux Web UI</h1>
+          <h1 className="font-bold text-white tracking-tight text-lg">TERMUXWEB</h1>
         </div>
         
         <nav className="p-4 flex-1 space-y-1 overflow-y-auto">
@@ -310,23 +310,23 @@ export default function App() {
       <main className="flex-1 flex flex-col h-screen overflow-hidden">
         {/* Mobile Header */}
         <div className="md:hidden bg-slate-900 border-b border-slate-800 flex flex-col shrink-0">
-          <div className="p-4 border-b border-slate-800/50 flex justify-between items-center">
+          <div className="p-3 border-b border-slate-800/50 flex justify-between items-center">
             <div className="flex items-center gap-2">
-              <Terminal className="text-emerald-400 h-5 w-5" />
-              <span className="font-bold text-white">Termux Web UI</span>
+              <Terminal className="text-emerald-400 h-4 w-4" />
+              <span className="font-bold text-white text-sm">TERMUXWEB</span>
             </div>
           </div>
-          <div className="flex overflow-x-auto whitespace-nowrap p-3 gap-2 [&::-webkit-scrollbar]:hidden">
-            <button onClick={() => setActiveTab('setup')} className={`px-4 py-2 text-sm rounded-full font-medium transition-colors ${activeTab === 'setup' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>Setup</button>
-            <button onClick={() => setActiveTab('files')} className={`px-4 py-2 text-sm rounded-full font-medium transition-colors gap-1.5 flex items-center ${activeTab === 'files' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}><Folder className="w-4 h-4"/> Files</button>
-            <button onClick={() => setActiveTab('system')} className={`px-4 py-2 text-sm rounded-full font-medium transition-colors gap-1.5 flex items-center ${activeTab === 'system' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}><HardDrive className="w-4 h-4"/> System</button>
-            <button onClick={() => setActiveTab('device')} className={`px-4 py-2 text-sm rounded-full font-medium transition-colors gap-1.5 flex items-center ${activeTab === 'device' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}><Smartphone className="w-4 h-4"/> Device</button>
-            <button onClick={() => setActiveTab('processes')} className={`px-4 py-2 text-sm rounded-full font-medium transition-colors gap-1.5 flex items-center ${activeTab === 'processes' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}><List className="w-4 h-4"/> Processes</button>
-            <button onClick={() => setActiveTab('snippets')} className={`px-4 py-2 text-sm rounded-full font-medium transition-colors gap-1.5 flex items-center ${activeTab === 'snippets' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}><Bookmark className="w-4 h-4"/> Snippets</button>
-            <button onClick={() => setActiveTab('network')} className={`px-4 py-2 text-sm rounded-full font-medium transition-colors gap-1.5 flex items-center ${activeTab === 'network' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}><Wifi className="w-4 h-4"/> Scanner</button>
-            <button onClick={() => setActiveTab('scraper')} className={`px-4 py-2 text-sm rounded-full font-medium transition-colors gap-1.5 flex items-center ${activeTab === 'scraper' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}><Globe className="w-4 h-4"/> Scraper</button>
-            <button onClick={() => setActiveTab('apk')} className={`px-4 py-2 text-sm rounded-full font-medium transition-colors gap-1.5 flex items-center ${activeTab === 'apk' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}><Cpu className="w-4 h-4"/> APK</button>
-            <button onClick={() => setActiveTab('terminal')} className={`px-4 py-2 text-sm rounded-full font-medium transition-colors gap-1.5 flex items-center ${activeTab === 'terminal' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}><Activity className="w-4 h-4"/> Terminal</button>
+          <div className="flex overflow-x-auto whitespace-nowrap p-2 gap-2 [&::-webkit-scrollbar]:hidden">
+            <button onClick={() => setActiveTab('setup')} className={`px-3 py-1.5 text-xs rounded-full font-medium transition-colors ${activeTab === 'setup' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>Setup</button>
+            <button onClick={() => setActiveTab('files')} className={`px-3 py-1.5 text-xs rounded-full font-medium transition-colors gap-1.5 flex items-center ${activeTab === 'files' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}><Folder className="w-3 h-3"/> Files</button>
+            <button onClick={() => setActiveTab('system')} className={`px-3 py-1.5 text-xs rounded-full font-medium transition-colors gap-1.5 flex items-center ${activeTab === 'system' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}><HardDrive className="w-3 h-3"/> System</button>
+            <button onClick={() => setActiveTab('device')} className={`px-3 py-1.5 text-xs rounded-full font-medium transition-colors gap-1.5 flex items-center ${activeTab === 'device' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}><Smartphone className="w-3 h-3"/> Device</button>
+            <button onClick={() => setActiveTab('processes')} className={`px-3 py-1.5 text-xs rounded-full font-medium transition-colors gap-1.5 flex items-center ${activeTab === 'processes' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}><List className="w-3 h-3"/> Processes</button>
+            <button onClick={() => setActiveTab('snippets')} className={`px-3 py-1.5 text-xs rounded-full font-medium transition-colors gap-1.5 flex items-center ${activeTab === 'snippets' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}><Bookmark className="w-3 h-3"/> Snippets</button>
+            <button onClick={() => setActiveTab('network')} className={`px-3 py-1.5 text-xs rounded-full font-medium transition-colors gap-1.5 flex items-center ${activeTab === 'network' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}><Wifi className="w-3 h-3"/> Scanner</button>
+            <button onClick={() => setActiveTab('scraper')} className={`px-3 py-1.5 text-xs rounded-full font-medium transition-colors gap-1.5 flex items-center ${activeTab === 'scraper' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}><Globe className="w-3 h-3"/> Scraper</button>
+            <button onClick={() => setActiveTab('apk')} className={`px-3 py-1.5 text-xs rounded-full font-medium transition-colors gap-1.5 flex items-center ${activeTab === 'apk' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}><Cpu className="w-3 h-3"/> APK</button>
+            <button onClick={() => setActiveTab('terminal')} className={`px-3 py-1.5 text-xs rounded-full font-medium transition-colors gap-1.5 flex items-center ${activeTab === 'terminal' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}><Activity className="w-3 h-3"/> Terminal</button>
           </div>
         </div>
 
@@ -405,29 +405,31 @@ export default function App() {
               <div className="space-y-6 fade-in h-[calc(100vh-140px)] flex flex-col">
                 <Header title="File Manager" desc="Jelajahi file Termux (Pastikan sudah izinkan akses storage: termux-setup-storage)" icon={<Folder className="text-yellow-400"/>} />
                 <div className="bg-slate-900 border border-slate-800 rounded-xl flex-1 flex flex-col min-h-0">
-                  <div className="p-4 border-b border-slate-800 flex flex-col sm:flex-row gap-2 sm:items-center shrink-0">
-                    <div className="flex gap-2 mb-2 sm:mb-0">
-                       <button onClick={() => loadDirectory('/sdcard')} className="bg-slate-800 hover:bg-slate-700 text-xs px-3 py-1.5 rounded text-slate-300">/sdcard</button>
-                       <button onClick={() => loadDirectory('/data/data/com.termux/files/home')} className="bg-slate-800 hover:bg-slate-700 text-xs px-3 py-1.5 rounded text-slate-300">Home (~)</button>
+                  <div className="p-3 border-b border-slate-800 flex flex-col gap-2 shrink-0">
+                    <div className="flex gap-2">
+                       <button onClick={() => loadDirectory('/sdcard')} className="bg-slate-800 hover:bg-slate-700 text-xs px-3 py-1.5 rounded text-slate-300 flex-1 sm:flex-none">/sdcard</button>
+                       <button onClick={() => loadDirectory('/data/data/com.termux/files/home')} className="bg-slate-800 hover:bg-slate-700 text-xs px-3 py-1.5 rounded text-slate-300 flex-1 sm:flex-none">Home (~)</button>
                     </div>
-                    <div className="flex flex-1 gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
                       <input 
                         type="text" value={filePath} onChange={(e) => setFilePath(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && loadDirectory(filePath)}
-                        className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 text-sm focus:outline-none focus:ring-1 focus:ring-yellow-500"
+                        className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:ring-1 focus:ring-yellow-500"
                       />
-                      <button onClick={() => loadDirectory(filePath)} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition cursor-pointer">
-                        Load
-                      </button>
-                      <button 
-                        onClick={() => {
-                           let parent = currentPathDisplay.split('/').filter(Boolean).slice(0, -1).join('/');
-                           parent = parent ? `/${parent}` : '/';
-                           loadDirectory(parent);
-                        }} 
-                        className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-2.5 rounded-lg text-sm transition cursor-pointer">
-                        Up
-                      </button>
+                      <div className="flex gap-2">
+                        <button onClick={() => loadDirectory(filePath)} className="flex-1 sm:flex-none bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition cursor-pointer">
+                          Load
+                        </button>
+                        <button 
+                          onClick={() => {
+                             let parent = currentPathDisplay.split('/').filter(Boolean).slice(0, -1).join('/');
+                             parent = parent ? `/${parent}` : '/';
+                             loadDirectory(parent);
+                          }} 
+                          className="flex-1 sm:flex-none bg-slate-800 hover:bg-slate-700 text-white px-3 py-2 rounded-lg text-sm transition cursor-pointer">
+                          Up
+                        </button>
+                      </div>
                     </div>
                   </div>
                   
